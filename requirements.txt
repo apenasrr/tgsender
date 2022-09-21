@@ -1,0 +1,9 @@
+asyncio
+natsort
+openpyxl
+pyperclip
+pandas
+pyrogram
+pyautogui
+tgcrypto
+unidecode
