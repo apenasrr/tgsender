@@ -433,6 +433,8 @@ def get_channel_description(chat_invite_link, folder_path_descriptions):
 
 def get_list_adms(channel_adms: str):
 
+    if not channel_adms:
+        return []
     channel_adms_stringa_list = channel_adms.split(",")
     list_adms = []
     for line in channel_adms_stringa_list:
