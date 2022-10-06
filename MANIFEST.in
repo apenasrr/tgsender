@@ -4,6 +4,7 @@ include HISTORY.rst
 include LICENSE
 include README.rst
 include tgsender\config.ini
+include template\header_project.txt
 
 recursive-include tests *
 recursive-exclude * __pycache__
