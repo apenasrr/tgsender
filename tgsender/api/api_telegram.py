@@ -235,7 +235,7 @@ def send_file(dict_file_data, chat_id, time_limit=99):
 
     file_path = dict_file_data["file_output"]
     description = dict_file_data["description"]
-    file_extension = Path(file_path).suffix
+    file_extension = Path(file_path).suffix.lower()
     if file_extension == ".mp4":
         type_file = "video"
     elif file_extension == ".mp3":
