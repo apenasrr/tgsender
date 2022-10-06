@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 import sys
@@ -408,7 +410,7 @@ def get_channel_title(folder_path_descriptions):
     header_project_path = get_template(
         folder_path_descriptions, header_project_name
     )
-    print(f"\n{header_project_path=}\n")
+
     channel_info_stringa = utils.get_txt_content(header_project_path)
     list_channel_info = channel_info_stringa.split("\n")
 
