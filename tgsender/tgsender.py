@@ -268,7 +268,7 @@ def send_via_telegram_api(folder_path_upload_plan: Path, dict_config: dict):
 def test_chat_id(dict_config):
 
     if "chat_id" in dict_config.keys():
-        chat_id = dict_config["chat_id"]
+        chat_id = int(dict_config["chat_id"])
         is_int = isinstance(chat_id, int)
         if is_int:
             if chat_id < 0:
@@ -313,7 +313,7 @@ def process_to_send_telegram(folder_path_descriptions, dict_config):
 
     # get chat_id
     # Create new channel-Default True
-    if dict_config["create_new_channel"] == 0 or continue_upload:
+    if dict_config["create_new_channel"] == '0' or continue_upload:
         channel_new = False
     else:
         channel_new = True
@@ -338,7 +338,7 @@ def process_to_send_telegram(folder_path_descriptions, dict_config):
 
         chat_id_is_valid = test_chat_id(dict_data)
         if chat_id_is_valid:
-            chat_id = dict_data["chat_id"]
+            chat_id = int(dict_data["chat_id"])
 
     return chat_id
 
