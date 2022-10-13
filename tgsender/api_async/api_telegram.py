@@ -17,13 +17,13 @@ def logging_config():
     log_file_name = "api_telegram"
     logfilename = "log-" + log_file_name + ".txt"
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.warning,
         format=" %(asctime)s-%(levelname)s-%(message)s",
         handlers=[logging.FileHandler(logfilename, "w", "utf-8")],
     )
     # set up logging to console
     console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
+    console.setLevel(logging.warning)
     # set a format which is simpler for console use
     formatter = logging.Formatter(" %(asctime)s-%(levelname)s-%(message)s")
     console.setFormatter(formatter)
@@ -31,17 +31,24 @@ def logging_config():
     logging.getLogger("").addHandler(console)
 
 
-def ensure_connection():
+async def get_telegram_app():
 
+    app = Client("user")
+    return await app.start()
+
+
+async def ensure_connection():
+
+    logging.warning("Ensuring connection...")
     if Path("user.session").exists():
         try:
-            with Client(
+            async with Client(
                 "user", workdir=Path("user.session").absolute().parent
             ) as app:
-                message = app.send_message(
+                message = await app.send_message(
                     "me", text="telegram filesender-Connected..."
                 )
-                message.delete()
+                await message.delete()
             return
         except:
             print("Delete Session file and try again.")
@@ -51,16 +58,16 @@ def ensure_connection():
             api_id = int(input("Enter your api_id: "))
             api_hash = input("Enter your api_hash: ")
 
-            with Client(
+            async with Client(
                 "user",
                 api_id,
                 api_hash,
                 workdir=Path("user.session").absolute().parent,
             ) as app:
-                message = app.send_message(
+                message = await app.send_message(
                     "me", text="telegram filesender-Connected..."
                 )
-                message.delete()
+                await message.delete()
             return
         except:
             print("\nError. Try again.\n")
@@ -77,9 +84,8 @@ def progress(current, total):
     sys.stdout.flush()
 
 
-def send_video(chat_id, file_path, caption):
+def get_video_metadata(file_path):
 
-    logging.info("Sending video...")
     try:
         metadata = ffprobe(file_path).get_output_as_dict()
         metadata_streams = metadata["streams"]
@@ -99,87 +105,103 @@ def send_video(chat_id, file_path, caption):
         width = video_metadata["width"]
         height = video_metadata["height"]
         duration = int(float(metadata["format"]["duration"]))
+        return {"width": width, "height": height, "duration": duration}
     except Exception as e:
         logging.error(f"File Error: {file_path}.\napi_telegram.py line 63")
         raise ValueError(e)
+
+
+async def send_video(app, chat_id, file_path, caption):
+
+    logging.warning("Sending video...")
+
+    video_metadata = get_video_metadata(file_path)
     thumb = utils.create_thumb(file_path)
 
-    with Client("user", workdir=Path("user.session").absolute().parent) as app:
-        return_ = app.send_video(
-            chat_id,
-            file_path,
-            caption=caption,
-            progress=progress,
-            supports_streaming=True,
-            width=width,
-            height=height,
-            duration=duration,
-            thumb=thumb,
-        )
+    return_ = await app.send_video(
+        chat_id,
+        file_path,
+        caption=caption,
+        progress=progress,
+        supports_streaming=True,
+        width=video_metadata["width"],
+        height=video_metadata["height"],
+        duration=video_metadata["duration"],
+        thumb=thumb,
+    )
     os.remove(thumb)
     return return_
 
 
-def send_sticker(chat_id, sticker):
+async def send_sticker(chat_id, sticker):
 
-    logging.info("Sending sticker...")
-    with Client("user", workdir=Path("user.session").absolute().parent) as app:
-        return_ = app.send_sticker(chat_id, sticker)
+    logging.warning("Sending sticker...")
+    async with Client(
+        "user", workdir=Path("user.session").absolute().parent
+    ) as app:
+        return_ = await app.send_sticker(chat_id, sticker)
+        return return_
+
+
+async def send_audio(app, chat_id, file_path, caption):
+    logging.warning("Sending audio...")
+    return_ = await app.send_audio(
+        chat_id, file_path, caption=caption, progress=progress
+    )
     return return_
 
 
-def send_photo(chat_id, file_path, caption):
+async def send_document(app, chat_id, file_path, caption):
 
-    logging.info("Sending photo...")
-    with Client("user", workdir=Path("user.session").absolute().parent) as app:
-        return_ = app.send_photo(
+    logging.warning("Sending document...")
+    return_ = await app.send_document(
+        chat_id, file_path, caption=caption, progress=progress
+    )
+    return return_
+
+
+async def send_photo(chat_id, file_path, caption):
+
+    logging.warning("Sending photo...")
+    async with Client(
+        "user", workdir=Path("user.session").absolute().parent
+    ) as app:
+        return_ = await app.send_photo(
             chat_id, file_path, caption=caption, progress=progress
         )
     return return_
 
 
-def send_audio(chat_id, file_path, caption):
-    logging.info("Sending audio...")
-    with Client("user", workdir=Path("user.session").absolute().parent) as app:
-        return_ = app.send_audio(
-            chat_id, file_path, caption=caption, progress=progress
-        )
-    return return_
+async def send_message(chat_id, text):
 
-
-def send_document(chat_id, file_path, caption):
-    logging.info("Sending document...")
-    with Client("user", workdir=Path("user.session").absolute().parent) as app:
-        return_ = app.send_document(
-            chat_id, file_path, caption=caption, progress=progress
-        )
-    return return_
-
-
-def send_message(chat_id, text):
-
-    logging.info("Sending message...")
-    with Client("user", workdir=Path("user.session").absolute().parent) as app:
-        return_ = app.send_message(
+    logging.warning("Sending message...")
+    async with Client(
+        "user", workdir=Path("user.session").absolute().parent
+    ) as app:
+        return_ = await app.send_message(
             chat_id, text=text, disable_web_page_preview=True
         )
     return return_
 
 
-def pin_chat_message(chat_id, message_id):
+async def pin_chat_message(chat_id, message_id):
 
-    logging.info("Pinning message...")
-    with Client("user", workdir=Path("user.session").absolute().parent) as app:
-        return_ = app.pin_chat_message(
+    logging.warning("Pinning message...")
+    async with Client(
+        "user", workdir=Path("user.session").absolute().parent
+    ) as app:
+        return_ = await app.pin_chat_message(
             chat_id, message_id=message_id, both_sides=True
         )
     return return_
 
 
-def get_messages(chat_id, message_ids):
+async def get_messages(chat_id, message_ids):
 
-    with Client("user", workdir=Path("user.session").absolute().parent) as app:
-        return_ = app.get_messages(chat_id, message_ids)
+    async with Client(
+        "user", workdir=Path("user.session").absolute().parent
+    ) as app:
+        return_ = await app.get_messages(chat_id, message_ids)
     return return_
 
 
@@ -215,23 +237,27 @@ def get_list_media_doc(list_dict_sent_doc):
     return list_media_doc
 
 
-def send_media_group(chat_id, list_media):
+async def send_media_group(chat_id, list_media):
 
-    with Client("user", workdir=Path("user.session").absolute().parent) as app:
-        return_ = app.send_media_group(chat_id, media=list_media)
+    async with Client(
+        "user", workdir=Path("user.session").absolute().parent
+    ) as app:
+        return_ = await app.send_media_group(chat_id, media=list_media)
     return return_
 
 
-def delete_messages(chat_id, list_message_id):
+async def delete_messages(chat_id, list_message_id):
 
-    with Client("user", workdir=Path("user.session").absolute().parent) as app:
-        return_ = app.delete_messages(
+    async with Client(
+        "user", workdir=Path("user.session").absolute().parent
+    ) as app:
+        return_ = await app.delete_messages(
             chat_id=chat_id, message_ids=list_message_id
         )
     return return_
 
 
-def send_file(dict_file_data, chat_id, time_limit=99):
+async def send_file(app, dict_file_data, chat_id):
 
     file_path = dict_file_data["file_output"]
     description = dict_file_data["description"]
@@ -246,25 +272,29 @@ def send_file(dict_file_data, chat_id, time_limit=99):
         type_file = "document"
 
     if type_file == "video":
-        return_ = send_video(
+        return_ = await send_video(
+            app,
             chat_id=chat_id,
             file_path=file_path,
             caption=description,
         )
     elif type_file == "audio":
-        return_ = send_audio(
+        return_ = await send_audio(
+            app,
             chat_id=chat_id,
             file_path=file_path,
             caption=description,
         )
     elif type_file == "photo":
-        return_ = send_photo(
+        return_ = await send_photo(
+            app,
             chat_id=chat_id,
             file_path=file_path,
             caption=description,
         )
     elif type_file == "document":
-        return_ = send_document(
+        return_ = await send_document(
+            app,
             chat_id=chat_id,
             file_path=file_path,
             caption=description,
@@ -273,7 +303,7 @@ def send_file(dict_file_data, chat_id, time_limit=99):
     return return_
 
 
-def send_files(list_dict, chat_id, time_limit=20):
+async def send_files(list_dict, chat_id, time_limit=20):
     """Sends a series of files to the same chat_id
 
     Args:
@@ -285,6 +315,9 @@ def send_files(list_dict, chat_id, time_limit=20):
 
     list_return = []
     len_list_dict = len(list_dict)
+
+    app = await get_telegram_app()
+
     for index, d in enumerate(list_dict):
         order = index + 1
         file_path = d["file_output"]
@@ -293,10 +326,7 @@ def send_files(list_dict, chat_id, time_limit=20):
             logging.error(f"file not exist. {file_path}")
             continue
 
-        now = datetime.now()
-        dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
-        print(f"{dt_string}-{order}/{len_list_dict} Uploading: {file_path}")
-        logging.info(f"{order}/{len_list_dict} Uploading: {file_path}")
+        logging.warning(f"{order}/{len_list_dict} Uploading: {file_path}")
 
         file_extension = Path(file_path).suffix
         description = d["description"]
@@ -313,25 +343,29 @@ def send_files(list_dict, chat_id, time_limit=20):
         while True:
             try:
                 if type_file == "video":
-                    return_ = send_video(
+                    return_ = await send_video(
+                        app,
                         chat_id=chat_id,
                         file_path=file_path,
                         caption=description,
                     )
                 elif type_file == "audio":
-                    return_ = send_audio(
+                    return_ = await send_audio(
+                        app,
                         chat_id=chat_id,
                         file_path=file_path,
                         caption=description,
                     )
                 elif type_file == "photo":
-                    return_ = send_photo(
+                    return_ = await send_photo(
+                        app,
                         chat_id=chat_id,
                         file_path=file_path,
                         caption=description,
                     )
                 elif type_file == "document":
-                    return_ = send_document(
+                    return_ = await send_document(
+                        app,
                         chat_id=chat_id,
                         file_path=file_path,
                         caption=description,
@@ -343,28 +377,39 @@ def send_files(list_dict, chat_id, time_limit=20):
                 time.sleep(30)
                 continue
         list_return.append(return_)
+    await app.stop()
     return list_return
 
 
-def create_channel(title, description):
+async def create_channel(title, description):
 
-    with Client("user", workdir=Path("user.session").absolute().parent) as app:
-        return_chat = app.create_channel(title=title, description=description)
+    async with Client(
+        "user", workdir=Path("user.session").absolute().parent
+    ) as app:
+        return_chat = await app.create_channel(
+            title=title, description=description
+        )
     chat_id = return_chat.id
     return chat_id
 
 
-def add_chat_members(chat_id, user_ids):
+async def add_chat_members(chat_id, user_ids):
 
-    with Client("user", workdir=Path("user.session").absolute().parent) as app:
-        return_chat = app.add_chat_members(chat_id=chat_id, user_ids=user_ids)
+    async with Client(
+        "user", workdir=Path("user.session").absolute().parent
+    ) as app:
+        return_chat = await app.add_chat_members(
+            chat_id=chat_id, user_ids=user_ids
+        )
 
 
-def promote_chat_members(chat_id, user_ids):
+async def promote_chat_members(chat_id, user_ids):
 
-    with Client("user", workdir=Path("user.session").absolute().parent) as app:
+    async with Client(
+        "user", workdir=Path("user.session").absolute().parent
+    ) as app:
 
-        privileges_config = types.ChatPrivileges(
+        privileges_config = await types.ChatPrivileges(
             can_change_info=True,
             can_post_messages=True,
             can_edit_messages=True,
@@ -373,21 +418,27 @@ def promote_chat_members(chat_id, user_ids):
         )
 
         for user_id in user_ids:
-            app.promote_chat_member(
+            await app.promote_chat_member(
                 chat_id=chat_id, user_id=user_id, privileges=privileges_config
             )
 
 
-def set_chat_description(chat_id, description):
+async def set_chat_description(chat_id, description):
 
-    with Client("user", workdir=Path("user.session").absolute().parent) as app:
-        app.set_chat_description(chat_id=chat_id, description=description)
+    async with Client(
+        "user", workdir=Path("user.session").absolute().parent
+    ) as app:
+        await app.set_chat_description(
+            chat_id=chat_id, description=description
+        )
 
 
-def export_chat_invite_link(chat_id):
+async def export_chat_invite_link(chat_id):
 
-    with Client("user", workdir=Path("user.session").absolute().parent) as app:
-        return_ = app.export_chat_invite_link(chat_id=chat_id)
+    async with Client(
+        "user", workdir=Path("user.session").absolute().parent
+    ) as app:
+        return_ = await app.export_chat_invite_link(chat_id=chat_id)
 
     return return_
 
