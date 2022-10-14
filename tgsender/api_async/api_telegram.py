@@ -409,7 +409,7 @@ async def promote_chat_members(chat_id, user_ids):
         "user", workdir=Path("user.session").absolute().parent
     ) as app:
 
-        privileges_config = await types.ChatPrivileges(
+        privileges_config = types.ChatPrivileges(
             can_change_info=True,
             can_post_messages=True,
             can_edit_messages=True,
