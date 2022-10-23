@@ -12,7 +12,7 @@ import pandas as pd
 import pyautogui as pag
 import pyperclip
 
-from . import api_async, utils
+from . import api, api_async, utils
 
 
 def get_config_data(path_file_config):
@@ -228,19 +228,17 @@ async def config_channel(
         )
 
 
-async def send_via_telegram_api_async(
-    folder_path_upload_plan: Path, dict_config: dict
-):
+def send_via_telegram_api(folder_path_upload_plan: Path, dict_config: dict):
 
     file_path_descriptions = folder_path_upload_plan / "upload_plan.csv"
     df_list = pd.read_csv(file_path_descriptions)
 
     ensure_existence_sent_column(df_list, file_path_descriptions)
 
-    await api_async.ensure_connection()
+    api.ensure_connection()
 
-    chat_id = await process_to_send_telegram(
-        folder_path_upload_plan, dict_config
+    chat_id = asyncio.run(
+        process_to_send_telegram(folder_path_upload_plan, dict_config)
     )
     time_limit = int(dict_config["time_limit"])
 
@@ -248,9 +246,6 @@ async def send_via_telegram_api_async(
     # to send files without pause to fill connection pool
 
     files_count = df_list.shape[0]
-    # start client connection
-    app = await api_async.get_telegram_app()
-
     while True:
         index, dict_file_data = get_next_video_to_send(file_path_descriptions)
         # mark file as sent
@@ -261,7 +256,7 @@ async def send_via_telegram_api_async(
             logging.warning(f"{index+1}/{files_count} Uploading: {file_path}")
 
             try:
-                await api_async.send_file(app, dict_file_data, chat_id)
+                api.send_file(dict_file_data, chat_id, time_limit)
             except Exception as e:
                 logging.error("pyrogram error. %s", e)
                 logging.warning("Trying again send file...")
@@ -269,9 +264,6 @@ async def send_via_telegram_api_async(
             update_description_file_sent(
                 file_path_descriptions, dict_file_data
             )
-    # stop client connection
-    print("stop client connection")
-    await app.stop()
 
 
 def test_chat_id(dict_config):
@@ -330,6 +322,7 @@ async def process_to_send_telegram(folder_path_descriptions, dict_config):
     if channel_new:
         # create new channel
         chat_id = await process_create_channel(folder_path_descriptions)
+        time.sleep(5)
         chat_invite_link = await api_async.export_chat_invite_link(
             chat_id=chat_id
         )
@@ -398,9 +391,7 @@ def main():
     if send_mode == 1:
         send_via_telegram_app(data_upload_plan)
     elif send_mode == 2:
-        asyncio.run(
-            send_via_telegram_api_async(upload_plan_path_folder, dict_config)
-        )
+        send_via_telegram_api(upload_plan_path_folder, dict_config)
 
 
 if __name__ == "__main__":
