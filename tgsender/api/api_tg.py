@@ -111,7 +111,7 @@ def send_video(chat_id, file_path, caption):
     logging.warning("Sending video...")
     video_metadata = get_video_metadata(file_path)
     thumb = utils.create_thumb(file_path)
-    with Client("user") as app:
+    with Client("user", workdir=Path("user.session").absolute().parent) as app:
         return_ = app.send_video(
             chat_id,
             file_path,
@@ -137,7 +137,7 @@ def send_sticker(chat_id, sticker):
 
 def send_audio(chat_id, file_path, caption):
 
-    with Client("user") as app:
+    with Client("user", workdir=Path("user.session").absolute().parent) as app:
         logging.warning("Sending audio...")
         return_ = app.send_audio(
             chat_id, file_path, caption=caption, progress=progress
@@ -148,7 +148,7 @@ def send_audio(chat_id, file_path, caption):
 def send_document(chat_id, file_path, caption):
 
     logging.warning("Sending document...")
-    with Client("user") as app:
+    with Client("user", workdir=Path("user.session").absolute().parent) as app:
         return_ = app.send_document(
             chat_id, file_path, caption=caption, progress=progress
         )
@@ -247,7 +247,7 @@ def send_file(dict_file_data, chat_id, time_limit=20):
     file_extension = Path(file_path).suffix.lower()
     if file_extension == ".mp4":
         type_file = "video"
-    elif file_extension == ".mp3":
+    elif file_extension in [".mp3", '.aac']:
         type_file = "audio"
     elif file_extension in [".png", ".jpg", ".jpeg", ".gif"]:
         type_file = "photo"
