@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
+from hashlib import md5
 from pathlib import Path
 
 import natsort
@@ -53,6 +55,67 @@ def get_txt_content(file_path):
             continue
 
     raise Exception("encode", f"Cannot open file: {file_path}")
+
+
+def get_log_file_path(
+    folder_path_project: Path, file_path_origin: Path, index: int
+) -> Path:
+    """get path of log file to be sent
+    Change origin file name to avoid duplicate name in the log folder
+     Change based on the path of the folder of the origin file
+
+    Args:
+        folder_path_project (Path): path of project folder,
+            where will be created the log_sent folder
+        file_path_origin (Path): path of file
+        index (int): file index in a row
+
+    Returns:
+        Path: path of log file
+    """
+
+    folder_path_log_sent = folder_path_project / "log_sent"
+    if not folder_path_log_sent.exists():
+        folder_path_log_sent.mkdir()
+
+    hash_sufix = md5(
+        str(file_path_origin.parent).encode(encoding="utf-8")
+    ).hexdigest()[:5]
+    extension = file_path_origin.suffix.replace(".", "")
+    log_file_name = (
+        str(index)
+        + "-"
+        + file_path_origin.stem
+        + "_"
+        + extension
+        + "_"
+        + hash_sufix
+        + ".json"
+    )
+    log_file_path = folder_path_log_sent / log_file_name
+    return log_file_path
+
+
+def log_send_return(
+    return_message: str, file_path: Path, log_file_path: Path
+) -> bool:
+    """Save json file of pyrogram message return from send_file method
+    with additional key 'file_origin', that is the path of file that was sent
+
+    Args:
+        return_message (str): pyrogram message return
+        file_path (Path): path of file that was sent
+        log_file_path (Path): json file of sent log
+    Return:
+        bool: True If log_file was successfully saved
+    """
+
+    dict_return = json.loads(return_message)
+    dict_return["file_origin"] = str(file_path)
+    json.dump(
+        dict_return, open(log_file_path, "w", encoding="utf-8"), indent=2
+    )
+    return log_file_path.exists()
 
 
 def get_all_file_path(folder_path: Path, sort=True) -> dict[str, list[Path]]:

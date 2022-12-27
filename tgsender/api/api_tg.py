@@ -106,7 +106,15 @@ def get_video_metadata(file_path):
         raise ValueError(e)
 
 
-def send_video(chat_id, file_path, caption):
+def send_sticker(chat_id, sticker):
+
+    logging.warning("Sending sticker...")
+    with Client("user", workdir=Path("user.session").absolute().parent) as app:
+        return_ = app.send_sticker(chat_id, sticker)
+        return return_
+
+
+def send_video(chat_id, file_path, caption, log_file_path=None):
 
     logging.warning("Sending video...")
     video_metadata = get_video_metadata(file_path)
@@ -124,45 +132,43 @@ def send_video(chat_id, file_path, caption):
             thumb=thumb,
         )
         os.remove(thumb)
-        return return_
+
+    if log_file_path:
+        utils.log_send_return(str(return_), file_path, Path(log_file_path))
 
 
-def send_sticker(chat_id, sticker):
-
-    logging.warning("Sending sticker...")
-    with Client("user", workdir=Path("user.session").absolute().parent) as app:
-        return_ = app.send_sticker(chat_id, sticker)
-        return return_
-
-
-def send_audio(chat_id, file_path, caption):
+def send_audio(chat_id, file_path, caption, log_file_path=None):
 
     with Client("user", workdir=Path("user.session").absolute().parent) as app:
         logging.warning("Sending audio...")
         return_ = app.send_audio(
             chat_id, file_path, caption=caption, progress=progress
         )
-        return return_
+    if log_file_path:
+        utils.log_send_return(str(return_), file_path, log_file_path)
 
 
-def send_document(chat_id, file_path, caption):
+def send_document(chat_id, file_path, caption, log_file_path=None):
 
     logging.warning("Sending document...")
     with Client("user", workdir=Path("user.session").absolute().parent) as app:
         return_ = app.send_document(
             chat_id, file_path, caption=caption, progress=progress
         )
-        return return_
+
+    if log_file_path:
+        utils.log_send_return(str(return_), file_path, Path(log_file_path))
 
 
-def send_photo(chat_id, file_path, caption):
+def send_photo(chat_id, file_path, caption, log_file_path=None):
 
     logging.warning("Sending photo...")
     with Client("user", workdir=Path("user.session").absolute().parent) as app:
         return_ = app.send_photo(
             chat_id, file_path, caption=caption, progress=progress
         )
-    return return_
+    if log_file_path:
+        utils.log_send_return(str(return_), file_path, log_file_path)
 
 
 def send_message(chat_id, text):
@@ -240,14 +246,16 @@ def delete_messages(chat_id, list_message_id):
     return return_
 
 
-def send_file(dict_file_data, chat_id, time_limit=20):
+def send_file(dict_file_data, chat_id, time_limit=20, log_file_path=None):
 
-    file_path = dict_file_data["file_output"]
+    file_path = dict_file_data.get("file_output")
+    if file_path is None:
+        file_path = dict_file_data.get("file_path")
     description = dict_file_data["description"]
     file_extension = Path(file_path).suffix.lower()
     if file_extension == ".mp4":
         type_file = "video"
-    elif file_extension in [".mp3", '.aac']:
+    elif file_extension in [".mp3", ".aac"]:
         type_file = "audio"
     elif file_extension in [".png", ".jpg", ".jpeg", ".gif"]:
         type_file = "photo"
@@ -258,50 +266,61 @@ def send_file(dict_file_data, chat_id, time_limit=20):
         "chat_id": chat_id,
         "file_path": file_path,
         "caption": description,
+        "log_file_path": str(log_file_path),
     }
-    # TODO: set param time_limit
     sec_time_out = time_limit * 60
     if type_file == "video":
-        return_ = utils.time_out(
-            sec_time_out, send_video, dict_params, restart=True
-        )
+        utils.time_out(sec_time_out, send_video, dict_params, restart=True)
     elif type_file == "audio":
-        return_ = utils.time_out(
-            sec_time_out, send_audio, dict_params, restart=True
-        )
+        utils.time_out(sec_time_out, send_audio, dict_params, restart=True)
     elif type_file == "photo":
-        return_ = utils.time_out(
-            sec_time_out, send_photo, dict_params, restart=True
-        )
+        utils.time_out(sec_time_out, send_photo, dict_params, restart=True)
     elif type_file == "document":
-        return_ = utils.time_out(
-            sec_time_out, send_document, dict_params, restart=True
-        )
-    return return_
+        utils.time_out(sec_time_out, send_document, dict_params, restart=True)
 
 
-def send_files(list_dict, chat_id, time_limit=20):
+def send_files(
+    list_dict: list[dict],
+    chat_id: int,
+    time_limit: int = 20,
+    folder_path_project: Path = None,
+):
     """Sends a series of files to the same chat_id
 
     Args:
-        list_dict (list): list of dict. dict with keys:
-            file_path=Absolute file_path
-            description=file description
-            file_output=file name for log
+        list_dict (list[dict]):
+            list of dict. dict with keys:
+                file_path: Absolute file_path
+                description: file description
+                file_output: Absolute file_path for log
+        chat_id (int):
+            chat id to send
+        time_limit (int):
+            time limit for upload before rebooting automatically
+        folder_path_project (Path):
+            Folder where Logs folder will be created
     """
 
-    list_return = []
+    list_log_file_path = []
     len_list_dict = len(list_dict)
 
     for index, d in enumerate(list_dict):
         order = index + 1
-        file_path = d["file_output"]
-
+        file_path = d.get("file_path")
+        file_output = d.get("file_output")
+        if not file_output:
+            file_output = Path(d["file_path"]).name
+        else:
+            file_output = file_output.name
+        if folder_path_project:
+            log_file_path = utils.get_log_file_path(
+                Path(folder_path_project), Path(file_path), index
+            )
         if not Path(file_path).exists():
-            logging.error(f"file not exist. {file_path}")
+            logging.error(f"file not exist. {file_output}")
             continue
 
-        logging.warning(f"{order}/{len_list_dict} Uploading: {file_path}")
+        logging.warning(f"{order}/{len_list_dict} Uploading: {file_output}")
 
         file_extension = Path(file_path).suffix
         description = d["description"]
@@ -319,24 +338,25 @@ def send_files(list_dict, chat_id, time_limit=20):
             "chat_id": chat_id,
             "file_path": file_path,
             "caption": description,
+            "log_file_path": log_file_path,
         }
         sec_time_out = time_limit * 60
         while True:
             try:
                 if type_file == "video":
-                    return_ = utils.time_out(
+                    utils.time_out(
                         sec_time_out, send_video, dict_params, restart=True
                     )
                 elif type_file == "audio":
-                    return_ = utils.time_out(
+                    utils.time_out(
                         sec_time_out, send_audio, dict_params, restart=True
                     )
                 elif type_file == "photo":
-                    return_ = utils.time_out(
+                    utils.time_out(
                         sec_time_out, send_photo, dict_params, restart=True
                     )
                 elif type_file == "document":
-                    return_ = utils.time_out(
+                    utils.time_out(
                         sec_time_out, send_document, dict_params, restart=True
                     )
                 break
@@ -345,8 +365,8 @@ def send_files(list_dict, chat_id, time_limit=20):
                 print("\nError. Trying again...")
                 time.sleep(30)
                 continue
-        list_return.append(return_)
-    return list_return
+        list_log_file_path.append(log_file_path)
+    return list_log_file_path
 
 
 def create_channel(title, description):

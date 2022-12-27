@@ -88,12 +88,12 @@ def change_between_telegram_winexplorer():
     time.sleep(2)
 
 
-def get_next_video_to_send(path_file_description: Path):
+def get_next_video_to_send(path_file_upload_plan: Path):
 
     try:
-        df = pd.read_csv(path_file_description)
+        df = pd.read_csv(path_file_upload_plan)
     except Exception as e:
-        print(f"Can't open file: {path_file_description}")
+        print(f"Can't open file: {path_file_upload_plan}")
         print(e)
 
     mask_df_to_send = df["sent"].isin([0])
@@ -229,11 +229,24 @@ async def config_channel(
 
 
 def send_via_telegram_api(folder_path_upload_plan: Path, dict_config: dict):
+    """send files via_telegram by api
 
-    file_path_descriptions = folder_path_upload_plan / "upload_plan.csv"
-    df_list = pd.read_csv(file_path_descriptions)
+    Args:
+        folder_path_upload_plan (Path):
+            Path folder with "upload_plan.csv" file.
+            Necessary columns: file_path, description sent
+            Optional columns: file_output
+        dict_config (dict):
+            configuration data.
+            template: [chat_id:negative int,
+                       channel_adms:
+                       create_new_channel: optional: [0 , 1]]
+    """
 
-    ensure_existence_sent_column(df_list, file_path_descriptions)
+    file_path_upload_plan = folder_path_upload_plan / "upload_plan.csv"
+    df_list = pd.read_csv(file_path_upload_plan)
+
+    ensure_existence_sent_column(df_list, file_path_upload_plan)
 
     api.ensure_connection()
 
@@ -247,23 +260,26 @@ def send_via_telegram_api(folder_path_upload_plan: Path, dict_config: dict):
 
     files_count = df_list.shape[0]
     while True:
-        index, dict_file_data = get_next_video_to_send(file_path_descriptions)
+        index, dict_file_data = get_next_video_to_send(file_path_upload_plan)
         # mark file as sent
         if dict_file_data is False:
             break
         else:
             file_path = dict_file_data["file_output"]
+            log_file_path = utils.get_log_file_path(
+                folder_path_upload_plan, Path(file_path), index
+            )
             logging.warning(f"{index+1}/{files_count} Uploading: {file_path}")
 
             try:
-                api.send_file(dict_file_data, chat_id, time_limit)
+                api.send_file(
+                    dict_file_data, chat_id, time_limit, log_file_path
+                )
             except Exception as e:
                 logging.error("pyrogram error. %s", e)
                 logging.warning("Trying again send file...")
 
-            update_description_file_sent(
-                file_path_descriptions, dict_file_data
-            )
+            update_description_file_sent(file_path_upload_plan, dict_file_data)
 
 
 def test_chat_id(dict_config):
@@ -395,5 +411,4 @@ def main():
 
 
 if __name__ == "__main__":
-
     main()

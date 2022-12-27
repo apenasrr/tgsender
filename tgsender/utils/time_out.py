@@ -7,9 +7,9 @@ https://stackoverflow.com/a/10415215
 import multiprocessing
 
 
-def func_subprocess(func_, return_dict, dict_params):
+def func_subprocess(func_, dict_params):
 
-    return_dict["return"] = func_(**dict_params)
+    func_(**dict_params)
 
 
 def time_out(sec_time_out, func_, dict_params={}, restart=False):
@@ -25,13 +25,9 @@ def time_out(sec_time_out, func_, dict_params={}, restart=False):
         type undefined: func_ return
     """
 
-    # Starts shared variable
-    manager = multiprocessing.Manager()
-    return_dict = manager.dict()
-
     # Starts process
     p = multiprocessing.Process(
-        target=func_subprocess, args=[func_, return_dict, dict_params]
+        target=func_subprocess, args=[func_, dict_params]
     )
     p.start()
 
@@ -48,10 +44,6 @@ def time_out(sec_time_out, func_, dict_params={}, restart=False):
 
         p.join()
         if restart:
-            return_dict["return"] = time_out(
-                sec_time_out, func_, dict_params, restart
-            )
+            time_out(sec_time_out, func_, dict_params, restart)
         else:
             pass
-
-    return return_dict["return"]
