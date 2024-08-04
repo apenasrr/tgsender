@@ -3,7 +3,7 @@ natsort
 openpyxl
 pyperclip
 pandas
-pyrogram
+pyrofork
 pyautogui
 tgcrypto
 unidecode
